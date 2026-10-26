@@ -1,0 +1,10 @@
+.env
+.venv/
+.git/
+.gitignore
+README.md
+compose.yaml
+Dockerfile
+uv.lock
+pyproject.toml
+example.env
