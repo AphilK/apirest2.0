@@ -1,0 +1,13 @@
+[project]
+name = "apirest2-0"
+version = "0.1.0"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi[standard]>=0.162.0",
+    "psycopg2-binary>=2.9.13",
+    "python-dotenv",
+    "sqlalchemy>=2.1.6",
+]
+
+[tool.fastapi]
+entrypoint = "src.backend.main:app"
