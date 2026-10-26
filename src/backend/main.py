@@ -1,9 +1,9 @@
 import os
-from enum import Enum
-from fastapi import FastAPI
-from sqlalchemy import Column, Integer, String, create_engine
-from sqlalchemy.ext.declarative import declarative_base
+from fastapi import FastAPI, HTTPException
+from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+
+from schemas import Clients, ClientCreate, Base
 
 USERNAME = os.getenv("POSTGRES_USER")
 PASSWORD = os.getenv("POSTGRES_PASSWORD")
@@ -14,36 +14,20 @@ PORT = os.getenv("PORT")
 SQLALCHEMY_DATABASE_URL = f"postgresql+psycopg2://{USERNAME}:{PASSWORD}@{HOST}:{PORT}/{DATABASE}"
 engine = create_engine(SQLALCHEMY_DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
-
-class Genero(str, Enum):
-    homem_cis = "Homem Cisgênero"
-    mulher_cis = "Mulher Cisgênero"
-    homem_trans = "Homem Transgênero"
-    mulher_trans = "Mulher Transgênero"
-    nao_binario = "Não-binário"
-    agenero = "Agênero"
-    genero_fluido = "Gênero-fluido"
-    bigenero = "Bigênero"
-
-class Clients(Base):
-    __tablename__ = "clients"
-
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, index=True)
-    email = Column(String, index=True)
-    genero = Column(String, index=True)
-    endereco = Column(String, index=True)
-    telefone = Column(String, index=True)
-
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
 @app.post("/clients/")
-async def create_clients(name: str, email: str, genero: Genero, endereco: str, telefone: str):
+async def create_clients(client_data: ClientCreate):
     db = SessionLocal()
-    db_client = Clients(name=name, email=email, genero=genero, endereco=endereco, telefone=telefone)
+    db_client = Clients(
+        name = client_data.name,
+        email = client_data.email,
+        genero = client_data.genero.value,
+        endereco = client_data.endereco,
+        telefone = client_data.telefone
+    )
     db.add(db_client)
     db.commit()
     db.refresh(db_client)
@@ -53,17 +37,26 @@ async def create_clients(name: str, email: str, genero: Genero, endereco: str, t
 async def get_clients(client_id: int):
     db = SessionLocal()
     client = db.query(Clients).filter(Clients.id == client_id).first()
+
+    if not client:
+        raise HTTPException(status_code=404, detail="Cliente não encontrado")
+
     return client
 
 @app.put("/clients/{client_id}")
-async def update_clients(client_id: int, name: str, email: str, genero: Genero, endereco: str, telefone: str):
+async def update_clients(client_id: int, client_data: ClientCreate):
     db = SessionLocal()
     client = db.query(Clients).filter(Clients.id == client_id).first()
-    client.name = name
-    client.email = email
-    client.genero = genero
-    client.endereco = endereco
-    client.telefone = telefone
+
+    if not client:
+        raise HTTPException(status_code=404, detail="Cliente não encontrado")
+
+    client.name = client_data.name
+    client.email = client_data.email
+    client.genero = client_data.genero
+    client.endereco = client_data.endereco
+    client.telefone = client_data.telefone
+
     db.commit()
     return client
 
@@ -71,6 +64,10 @@ async def update_clients(client_id: int, name: str, email: str, genero: Genero, 
 async def delete_client(client_id: int):
     db = SessionLocal()
     client = db.query(Clients).filter(Clients.id == client_id).first()
+
+    if not client:
+        raise HTTPException(status_code=404, detail="Cliente não encontrado")
+
     client_name = client.name
     db.delete(client)
     db.commit()
