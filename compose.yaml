@@ -5,15 +5,19 @@ services:
     environment:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - HOST=db
-      - PORT=${PORT}
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=${POSTGRES_PORT}
       - POSTGRES_DB=${POSTGRES_DB}
+      - REDIS_HOST=redis
+      - REDIS_PORT=${REDIS_PORT}
     container_name: fastapi_rest
     ports:
       - "80:80"
 
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     develop:
       watch:
@@ -35,10 +39,31 @@ services:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_DB=${POSTGRES_DB}
-      - PORT=${PORT}
+      - PORT=${POSTGRES_PORT}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 10s
       retries: 5
       start_period: 30s
       timeout: 10s
+
+  redis:
+    image: redis:8.10
+    container_name: ${REDIS_HOST}
+    ports:
+      - "${REDIS_PORT}:${REDIS_PORT}"
+    volumes:
+      - redis-data:/app/data
+    environment:
+      - REDIS_ARGS=--requirepass ${REDIS_PASS} --appendonly yes
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+volumes:
+  redis-data:
+    driver: local

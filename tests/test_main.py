@@ -1,12 +1,12 @@
-import sys
-import os
-
-path_backend = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src", "backend"))
-
-sys.path.insert(0, path_backend)
-
 from src.backend.main import app
 from fastapi.testclient import TestClient
+
+import os
+import pytest
+import redis.asyncio as redis
+
+REDIS_HOST = os.getenv("REDIS_HOST", "redis")
+REDIS_PORT = os.getenv("REDIS_PORT", )
 
 client = TestClient(app)
 
@@ -21,7 +21,7 @@ def test_crud_client():
             }
     )
 
-    assert response_post.status_code == 200
+    assert response_post.status_code == 201
 
     created_id = response_post.json()["id"]
 
@@ -73,3 +73,10 @@ def test_bad_delete_client():
 
     assert response.status_code == 404
     assert "detail" in response.json()
+
+@pytest.mark.asyncio
+async def test_redis_connection():
+    r = redis.Redis(host=REDIS_HOST, port=6379, decode_responses=True)
+    await r.set('foo', 'bar')
+    value = await r.get("foo") 
+    assert value == 'bar'

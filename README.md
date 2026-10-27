@@ -33,7 +33,6 @@ Como o caráter do projeto é puramente o aprendizado, ao final deste arquivo te
 
 ## TO-DOs (Próximos passos)
 
-- Implementar mais regras de negócio de modo a aumentar o realismo dessa API;
 - Uma interface front-end para consumir a API e torná-la mais visual;
 - Implementar microsserviços e protocolo de mensageria para descentralizar a aplicação;
 - Cumprimento de princípios de cybersegurança;
