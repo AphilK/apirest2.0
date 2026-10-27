@@ -12,5 +12,9 @@ else:
 
 redis_client = aioredis.from_url(REDIS_URL, decode_responses=True)
 
-async def get_redis() -> aioredis.Redis:
-    return redis_client
+async def get_redis():
+    client = aioredis.from_url(REDIS_URL, decode_responses=True)
+    try:
+        yield client
+    finally:
+        await client.aclose()
