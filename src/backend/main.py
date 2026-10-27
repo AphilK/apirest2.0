@@ -1,27 +1,21 @@
-import os
-from fastapi import FastAPI, HTTPException
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from fastapi import FastAPI, HTTPException, Depends, status
+from sqlalchemy.orm import Session
+import redis.asyncio as aioredis
 
-from schemas import Clients, ClientCreate, Base
+from src.backend.database import engine, Base, get_db
+from src.backend.models import ClientModel
+from src.backend.schemas import ClientCreate, ClientResponse
+from src.backend.redis_client import get_redis
 
-USERNAME = os.getenv("POSTGRES_USER")
-PASSWORD = os.getenv("POSTGRES_PASSWORD")
-DATABASE = os.getenv("POSTGRES_DB")
-HOST = os.getenv("HOST")
-PORT = os.getenv("PORT")
-
-SQLALCHEMY_DATABASE_URL = f"postgresql+psycopg2://{USERNAME}:{PASSWORD}@{HOST}:{PORT}/{DATABASE}"
-engine = create_engine(SQLALCHEMY_DATABASE_URL)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI()
+app = FastAPI(title="API Rest 2.0")
 
-@app.post("/clients/")
-async def create_clients(client_data: ClientCreate):
-    db = SessionLocal()
-    db_client = Clients(
+CACHE_EXPIRE_SECONDS = 120
+
+@app.post("/clients/", response_model=ClientResponse, status_code=status.HTTP_201_CREATED)
+def create_clients(client_data: ClientCreate, db: Session = Depends(get_db)):
+    db_client = ClientModel(
         name = client_data.name,
         email = client_data.email,
         genero = client_data.genero.value,
@@ -33,23 +27,40 @@ async def create_clients(client_data: ClientCreate):
     db.refresh(db_client)
     return db_client
 
-@app.get("/clients/{client_id}")
-async def get_clients(client_id: int):
-    db = SessionLocal()
-    client = db.query(Clients).filter(Clients.id == client_id).first()
+@app.get("/clients/{client_id}", response_model=ClientResponse)
+async def get_client(
+    client_id: int, 
+    db: Session = Depends(get_db), 
+    redis: aioredis.Redis = Depends(get_redis)
+):
+    cache_key = f"client:{client_id}"
+
+    cached_client = await redis.get(cache_key)
+    if cached_client:
+        return ClientResponse.model_validate_json(cached_client)
+
+    client = db.query(ClientModel).filter(ClientModel.id == client_id).first()
 
     if not client:
-        raise HTTPException(status_code=404, detail="Cliente não encontrado")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cliente não encontrado")
 
-    return client
+    client_response = ClientResponse.model_validate(client)
 
-@app.put("/clients/{client_id}")
-async def update_clients(client_id: int, client_data: ClientCreate):
-    db = SessionLocal()
-    client = db.query(Clients).filter(Clients.id == client_id).first()
+    await redis.set(cache_key, client_response.model_dump_json(), ex=CACHE_EXPIRE_SECONDS)
+
+    return client_response
+
+@app.put("/clients/{client_id}", response_model=ClientResponse)
+async def update_client(
+    client_id: int, 
+    client_data: ClientCreate, 
+    db: Session = Depends(get_db), 
+    redis: aioredis.Redis = Depends(get_redis)
+):
+    client = db.query(ClientModel).filter(ClientModel.id == client_id).first()
 
     if not client:
-        raise HTTPException(status_code=404, detail="Cliente não encontrado")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cliente não encontrado")
 
     client.name = client_data.name
     client.email = client_data.email
@@ -58,17 +69,31 @@ async def update_clients(client_id: int, client_data: ClientCreate):
     client.telefone = client_data.telefone
 
     db.commit()
+    db.refresh(client)
+
+    cache_key = f"client:{client_id}"
+    await redis.delete(cache_key)
+
     return client
 
 @app.delete("/clients/{client_id}")
-async def delete_client(client_id: int):
-    db = SessionLocal()
-    client = db.query(Clients).filter(Clients.id == client_id).first()
+async def delete_client(
+    client_id: int, 
+    db: Session = Depends(get_db),
+    redis: aioredis.Redis = Depends(get_redis)
+):
+    client = db.query(ClientModel).filter(ClientModel.id == client_id).first()
 
     if not client:
-        raise HTTPException(status_code=404, detail="Cliente não encontrado")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cliente não encontrado")
 
     client_name = client.name
+    message = f"Client {client_name} deletado com sucesso!"
+
     db.delete(client)
     db.commit()
-    return {"Message": "Client {client_name} deleted succesfully"}
+
+    cache_key = f"client:{client_id}"
+    await redis.delete(cache_key)
+
+    return {"Message": message}
