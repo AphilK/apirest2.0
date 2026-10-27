@@ -1,6 +1,6 @@
 # API Rest para um E-Commerce
 
-Esse projeto foi feito com o intuito de aprender mais sobre APIs Rest feitos com FastAPI e um banco de dados PostgreSQL, além de contaneirizá-los com Docker, **o projeto não está completo**, mais abaixo há uma lista com *features* que implementarei, aumentando a complexidade do projeto a medida que aprendo mais e mais sobre.
+Esse projeto foi feito com o intuito de aprender mais sobre APIs Rest feitos com FastAPI e um banco de dados PostgreSQL e caching com Redis, além de contaneirizá-los com Docker, **o projeto não está completo**, mais abaixo há uma lista com *features* que implementarei, aumentando a complexidade do projeto a medida que aprendo mais e mais sobre.
 
 **Importante salientar que como esse projeto tem um caráter de aprendizado, não utilizarei IA generativa, todo código aqui foi feito por mim, com base em pesquisas e leituras de documentações e fórums na internet.**
 
